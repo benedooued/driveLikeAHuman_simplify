@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Drive Replay</title>
+<style>
+  body { font-family: monospace; background: #1a1a2e; color: #eee; margin: 20px; }
+  h1 { color: #e94560; }
+  #controls { margin: 16px 0; display: flex; gap: 12px; align-items: center; }
+  input[type=range] { width: 400px; accent-color: #e94560; }
+  button { background: #e94560; color: #fff; border: none; padding: 8px 20px; cursor: pointer; border-radius: 4px; }
+  #scene { width: 100%; border-radius: 8px; margin: 12px 0; }
+  .panel { background: #16213e; border-radius: 8px; padding: 16px; margin: 8px 0; }
+  .panel h3 { color: #0f3460; margin: 0 0 8px; color: #e94560; }
+  pre { white-space: pre-wrap; font-size: 12px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<h1>🚗 DriveLikeAHuman — Replay</h1>
+<div id="controls">
+  <label>Frame: <span id="frameVal">{{ minFrame }}</span></label>
+  <input type="range" id="slider" min="{{ minFrame }}" max="{{ maxFrame }}" value="{{ minFrame }}" oninput="onSlide(this.value)">
+  <button onclick="loadFrame()">Load</button>
+</div>
+
+<img id="scene" src="" alt="scene">
+
+<div class="panel">
+  <h3>Parsed Decision</h3>
+  <pre id="parsed">–</pre>
+</div>
+<div class="panel">
+  <h3>Final Answer</h3>
+  <pre id="finalAnswer">–</pre>
+</div>
+<div class="panel">
+  <h3>Thoughts &amp; Tool Calls</h3>
+  <pre id="thoughts">–</pre>
+</div>
+
+<script>
+function onSlide(v) {
+  document.getElementById('frameVal').textContent = v;
+}
+
+function loadFrame() {
+  const frame = document.getElementById('slider').value;
+  const fd = new FormData();
+  fd.append('frame', frame);
+  fetch('/frame', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('scene').src = d.img;
+      document.getElementById('parsed').textContent = JSON.stringify(JSON.parse(d.parsedAction), null, 2);
+      document.getElementById('finalAnswer').textContent = d.finalAnswer;
+      document.getElementById('thoughts').textContent = d.thoughts;
+    });
+}
+
+loadFrame();
+</script>
+</body>
+</html>
