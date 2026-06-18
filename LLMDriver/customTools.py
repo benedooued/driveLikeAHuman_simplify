@@ -55,19 +55,28 @@ class getAvailableLanes:
 
     @prompts(
         name='Get Available Lanes',
-        description="Returns available lanes for a vehicle. Input: vehicle id string (e.g. 'ego')."
+        description="Returns available lanes for a vehicle. Input: vehicle id (e.g. 'ego')."
     )
     def inference(self, vid: str) -> str:
         veh = self.sce.vehicles[vid]
+
+        if self.sce.env_type == "roundabout":
+            # En roundabout : on liste les lanes adjacentes depuis le RoadNetwork
+            cur_lane = veh.lane_id
+            all_lanes = list(self.sce.lanes.keys())
+            parts = [f"`{cur_lane}` is the current lane."]
+            parts.append(f"Available lanes: {', '.join(f'`{l}`' for l in all_lanes[:6])}...")
+            parts.append("Lane changes follow the roundabout flow.")
+            return ' '.join(parts)
+
+        # Highway : logique originale
         idx = self.sce.lanes[veh.lane_id].laneIdx
         cur = veh.lane_id
         parts = [f"`{cur}` is the current lane."]
         if idx > 0:
-            left = f'lane_{idx - 1}'
-            parts.append(f"`{left}` is to the left.")
+            parts.append(f"`lane_{idx - 1}` is to the left.")
         if idx < 3:
-            right = f'lane_{idx + 1}'
-            parts.append(f"`{right}` is to the right.")
+            parts.append(f"`lane_{idx + 1}` is to the right.")
         return ' '.join(parts)
 
 
@@ -77,21 +86,28 @@ class getLaneInvolvedCar:
 
     @prompts(
         name='Get Lane Involved Car',
-        description="Returns cars that may affect your action in a specific lane. Input: lane id (e.g. 'lane_1'). Call Get Available Lanes first."
+        description="Returns cars that may affect your action in a specific lane. Input: lane id."
     )
     def inference(self, laneID: str) -> str:
-        if laneID not in {'lane_0', 'lane_1', 'lane_2', 'lane_3'}:
-            return "Invalid lane id. Use Get Available Lanes first."
+        # Validation dynamique selon env
+        if laneID not in self.sce.lanes:
+            valid = list(self.sce.lanes.keys())[:5]
+            return f"Invalid lane id. Valid examples: {valid}. Use Get Available Lanes first."
+
         ego = self.sce.vehicles['ego']
         lane_vehs = sorted(
-            [(v.id, v.lanePosition) for k, v in self.sce.vehicles.items()
+            [(v.id, v.lanePosition)
+             for k, v in self.sce.vehicles.items()
              if k != 'ego' and v.lane_id == laneID],
             key=lambda x: x[1]
         )
+
         if not lane_vehs:
             return f"No cars on {laneID}. Lane is safe."
 
-        leading_idx = next((i for i, (_, pos) in enumerate(lane_vehs) if pos >= ego.lanePosition), -1)
+        leading_idx = next(
+            (i for i, (_, pos) in enumerate(lane_vehs) if pos >= ego.lanePosition), -1
+        )
 
         if leading_idx == -1:
             return f"{lane_vehs[-1][0]} is behind ego on {laneID}. Check conflict."
@@ -105,7 +121,7 @@ class getLaneInvolvedCar:
             rear_id = lane_vehs[leading_idx - 1][0]
             spd = round(self.sce.vehicles[lead_id].speed, 1)
             dist = round(lead_pos - ego.lanePosition, 2)
-            return f"{lead_id} is ahead ({spd}m/s, {dist}m) and {rear_id} is behind ego on {laneID}. Check conflict with both."
+            return f"{lead_id} is ahead ({spd}m/s, {dist}m) and {rear_id} is behind on {laneID}. Check conflict with both."    
 
 
 class isChangeLaneConflictWithCar:

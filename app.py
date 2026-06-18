@@ -7,8 +7,21 @@ import sqlite3
 from flask import Flask, jsonify, render_template, request
 from scenario.scenarioReplay import ScenarioReplay
 
-DATABASE = './results-db/highway.db'
+import glob
+import os
+
+# Prend automatiquement le run le plus récent
+def get_latest_db():
+    dbs = glob.glob('results/**/*.db', recursive=True)
+    if not dbs:
+        raise FileNotFoundError("Aucune DB trouvée dans results/")
+    return max(dbs, key=os.path.getmtime)  # le plus récent par date de modification
+
+DATABASE = get_latest_db()
+print(f"DB chargée : {DATABASE}")
 sr = ScenarioReplay(DATABASE)
+
+
 app = Flask(__name__)
 
 
