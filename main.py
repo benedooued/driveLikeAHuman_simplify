@@ -17,6 +17,29 @@ from LLMDriver.customTools import (
     isKeepSpeedConflictWithCar, isDecelerationSafe,
 )
 
+
+
+
+
+def build_llm(model_name: str, max_tokens: int = 512) -> ChatGroq:
+    kwargs = {
+        "model_name": model_name,
+        "temperature": 0,
+        "max_tokens": max_tokens,
+    }
+
+    # Qwen 3.x
+    if model_name.startswith("qwen/"):
+        kwargs["reasoning_effort"] = "none"
+
+    # GPT-OSS
+    elif model_name.startswith("openai/gpt-oss"):
+        kwargs["reasoning_effort"] = "low"
+        kwargs["max_tokens"] = max(max_tokens, 1024)
+
+    return ChatGroq(**kwargs)
+
+
 # ── Config ────────────────────────────────────────────────────────────────────
 cfg = yaml.safe_load(open('config.yaml'))
 os.environ["GROQ_API_KEY"] = cfg['GROQ_API_KEY']
@@ -24,10 +47,11 @@ os.environ["GROQ_API_KEY"] = cfg['GROQ_API_KEY']
 ENV_TYPE = cfg.get('ENV_TYPE', 'highway')      # "highway" ou "roundabout"
 env_cfg  = cfg[ENV_TYPE]                        # sous-section du config
 
-llm = ChatGroq(
-    model_name=cfg.get('GROQ_MODEL', 'llama-3.3-70b-versatile'),
-    temperature=0,
-    max_tokens=512,
+llm = build_llm(
+    cfg.get(
+        "GROQ_MODEL",
+        "qwen/qwen3-32b"
+    )
 )
 
 # ── Configs par environnement ─────────────────────────────────────────────────

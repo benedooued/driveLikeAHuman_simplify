@@ -66,7 +66,7 @@ class DriverAgent:
             llm=self.llm,
             agent=AgentType.CHAT_ZERO_SHOT_REACT_DESCRIPTION,
             verbose=verbose,
-            memory=memory,
+            memory=None,  # memory is not used in this implementation
             agent_kwargs={
                 'system_message_prefix': SYSTEM_MESSAGE_PREFIX,
                 'system_message_suffix': SYSTEM_MESSAGE_SUFFIX,

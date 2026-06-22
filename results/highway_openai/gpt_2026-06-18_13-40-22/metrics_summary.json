@@ -1,0 +1,28 @@
+{
+    "scenario": "gpt_2026-06-18_13-40-22",
+    "safety": {
+        "collision_rate": 100.0,
+        "near_miss_rate": 0.0,
+        "hard_braking_rate": 10.0
+    },
+    "driving_control": {
+        "mean_lane_offset": 0.17224066257476806,
+        "acceleration_std": 2.0138713281324074,
+        "mean_acceleration": 0.3019940986118172
+    },
+    "reasoning": {
+        "action_validity_rate": 100.0,
+        "hallucination_rate": 0.0,
+        "consistency_failure_rate": null
+    },
+    "performance": {
+        "distance": 262.1336381449053,
+        "survival_time": 9.0,
+        "average_speed": 28.83775599613828,
+        "reward": 8.210952440170319
+    },
+    "human_like": {
+        "decision_latency_ms": 5996.502546600459,
+        "human_like_score": 0.34786755171383194
+    }
+}

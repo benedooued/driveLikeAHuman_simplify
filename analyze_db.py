@@ -1,120 +1,184 @@
 import sqlite3
 import pandas as pd
-import numpy as np
+import json
+from pathlib import Path
 
-DB_PATH = "/home/benedo/Téléchargements/driveLikeAHuman_simplify-main/results/highway_llama_2026-06-16_12-43-22/sim.db"
+RESULTS_DIR = Path("results")
 
-conn = sqlite3.connect(DB_PATH)
 
-metrics = pd.read_sql_query("SELECT * FROM metricsINFO", conn)
-episodes = pd.read_sql_query("SELECT * FROM episodeINFO", conn)
-decisions = pd.read_sql_query("SELECT * FROM decisionINFO", conn)
+# --------------------------------------------------
+# Find latest sim.db
+# --------------------------------------------------
+
+db_files = list(RESULTS_DIR.rglob("sim.db"))
+
+if not db_files:
+    raise FileNotFoundError("No sim.db found")
+
+latest_db = max(
+    db_files,
+    key=lambda p: p.stat().st_mtime
+)
+
+print(f"Using DB: {latest_db}")
+
+
+# --------------------------------------------------
+# Scenario name
+# --------------------------------------------------
+
+scenario_name = latest_db.parent.name
+
+
+# --------------------------------------------------
+# Load database
+# --------------------------------------------------
+
+conn = sqlite3.connect(latest_db)
+
+metrics = pd.read_sql_query(
+    "SELECT * FROM metricsINFO",
+    conn
+)
+
+episodes = pd.read_sql_query(
+    "SELECT * FROM episodeINFO",
+    conn
+)
+
+decisions = pd.read_sql_query(
+    "SELECT * FROM decisionINFO",
+    conn
+)
 
 conn.close()
 
-print("=" * 60)
-print("SAFETY METRICS")
-print("=" * 60)
+# print("\n===== DECISIONS COLUMNS =====")
+# print(decisions.columns)
 
-# Collision Rate
-collision_rate = episodes["collision"].mean() * 100
+# print("\n===== PARSEDACTION SAMPLE =====")
+# print(decisions["parsedAction"].head(10).tolist())
+# --------------------------------------------------
+# Safety
+# --------------------------------------------------
 
-# Near Miss Rate (seuil = 2 m)
-near_miss_rate = (
-    (metrics["min_vehicle_distance"] < 2.0).sum()
-    / len(metrics)
+collision_rate = float(
+    episodes["collision"].mean() * 100
+)
+
+near_miss_rate = float(
+    (
+        metrics["min_vehicle_distance"] < 2.0
+    ).mean()
     * 100
 )
 
-# Hard Braking Frequency
-hard_braking_count = (
-    metrics["ego_acceleration"] < -3.0
-).sum()
-
-hard_braking_rate = (
-    hard_braking_count
-    / len(metrics)
+hard_braking_rate = float(
+    (
+        metrics["ego_acceleration"] < -3.0
+    ).mean()
     * 100
 )
 
-print(f"Collision Rate (%): {collision_rate:.2f}")
-print(f"Near Miss Rate (%): {near_miss_rate:.2f}")
-print(f"Hard Braking Frequency (%): {hard_braking_rate:.2f}")
+
+# --------------------------------------------------
+# Driving Control
+# --------------------------------------------------
+
+mean_lane_offset = float(
+    metrics["lane_center_offset"]
+    .abs()
+    .mean()
+)
+
+acc_std = float(
+    metrics["ego_acceleration"]
+    .std()
+)
+
+acc_mean = float(
+    metrics["ego_acceleration"]
+    .mean()
+)
 
 
-print("\n" + "=" * 60)
-print("DRIVING CONTROL")
-print("=" * 60)
-
-# Lane Following Quality
-mean_lane_offset = metrics["lane_center_offset"].abs().mean()
-
-# Driving Smoothness
-acc_std = metrics["ego_acceleration"].std()
-
-# Acceleration Stability
-acc_mean = metrics["ego_acceleration"].mean()
-
-print(f"Mean Lane Offset (m): {mean_lane_offset:.3f}")
-print(f"Acceleration Std (m/s²): {acc_std:.3f}")
-print(f"Mean Acceleration (m/s²): {acc_mean:.3f}")
+# --------------------------------------------------
+# Reasoning
+# --------------------------------------------------
 
 
-print("\n" + "=" * 60)
-print("REASONING QUALITY")
-print("=" * 60)
 
-valid_actions = [
+valid_actions = {
     "IDLE",
     "FASTER",
     "SLOWER",
     "LANE_LEFT",
     "LANE_RIGHT"
-]
+}
 
-valid_count = decisions["parsedAction"].isin(valid_actions).sum()
-
-action_validity_rate = (
-    valid_count
-    / len(decisions)
-    * 100
+actions = decisions["parsedAction"].apply(
+    lambda x: json.loads(x).get("action_name", "")
 )
 
-print(f"Action Validity Rate (%): {action_validity_rate:.2f}")
+valid_count = actions.isin(valid_actions).sum()
 
-print("Thought-Action Consistency: Manual Evaluation")
-print("Hallucination Rate: Manual Evaluation")
-
-
-print("\n" + "=" * 60)
-print("PERFORMANCE")
-print("=" * 60)
-
-distance = episodes["total_distance"].mean()
-
-survival_time = episodes["survival_time"].mean()
-
-avg_speed = episodes["average_speed"].mean()
-
-reward = episodes["total_reward"].mean()
-
-print(f"Distance Travelled: {distance:.2f}")
-print(f"Survival Time: {survival_time:.2f}")
-print(f"Average Speed: {avg_speed:.2f}")
-print(f"Total Reward: {reward:.2f}")
+action_validity_rate = (
+    valid_count / len(actions) * 100
+)
 
 
-print("\n" + "=" * 60)
-print("HUMAN-LIKE BEHAVIOUR")
-print("=" * 60)
 
-decision_latency = metrics["decision_latency_ms"].mean()
 
-print(f"Decision Latency (ms): {decision_latency:.2f}")
+hallucination_rate = None
+consistency_failure_rate = None
 
-# Human-Like Score simplifié
+if "hallucination" in decisions.columns:
 
-safety_score = 1 - (collision_rate / 100)
+    hallucination_rate = float(
+        decisions["hallucination"]
+        .mean()
+        * 100
+    )
+
+if "consistency_failure" in decisions.columns:
+
+    consistency_failure_rate = float(
+        decisions["consistency_failure"]
+        .mean()
+        * 100
+    )
+
+
+# --------------------------------------------------
+# Performance
+# --------------------------------------------------
+
+distance = float(
+    episodes["total_distance"].mean()
+)
+
+survival_time = float(
+    episodes["survival_time"].mean()
+)
+
+avg_speed = float(
+    episodes["average_speed"].mean()
+)
+
+reward = float(
+    episodes["total_reward"].mean()
+)
+
+
+# --------------------------------------------------
+# Human Like
+# --------------------------------------------------
+
+decision_latency = float(
+    metrics["decision_latency_ms"].mean()
+)
+
+safety_score = 1 - collision_rate / 100
 
 lane_score = max(
     0,
@@ -125,12 +189,62 @@ smoothness_score = 1 / (
     1 + acc_std
 )
 
-human_like_score = (
+human_like_score = float(
     0.4 * safety_score
     + 0.3 * lane_score
     + 0.3 * smoothness_score
 )
 
-print(f"Human-Like Score: {human_like_score:.3f}")
 
-print("\nRule Violation Rate: Not Available")
+# --------------------------------------------------
+# JSON export
+# --------------------------------------------------
+
+results = {
+    "scenario": scenario_name,
+
+    "safety": {
+        "collision_rate": collision_rate,
+        "near_miss_rate": near_miss_rate,
+        "hard_braking_rate": hard_braking_rate,
+    },
+
+    "driving_control": {
+        "mean_lane_offset": mean_lane_offset,
+        "acceleration_std": acc_std,
+        "mean_acceleration": acc_mean,
+    },
+
+    "reasoning": {
+        "action_validity_rate": action_validity_rate,
+        "hallucination_rate": hallucination_rate,
+        "consistency_failure_rate": consistency_failure_rate,
+    },
+
+    "performance": {
+        "distance": distance,
+        "survival_time": survival_time,
+        "average_speed": avg_speed,
+        "reward": reward,
+    },
+
+    "human_like": {
+        "decision_latency_ms": decision_latency,
+        "human_like_score": human_like_score,
+    }
+}
+
+
+output_file = (
+    latest_db.parent /
+    "metrics_summary.json"
+)
+
+with open(output_file, "w") as f:
+    json.dump(
+        results,
+        f,
+        indent=4
+    )
+
+print(f"\nSaved: {output_file}")

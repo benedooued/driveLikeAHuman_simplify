@@ -1,0 +1,28 @@
+{
+    "scenario": "highway_llama_2026-06-18_17-28-15",
+    "safety": {
+        "collision_rate": 0.0,
+        "near_miss_rate": 0.0,
+        "hard_braking_rate": 0.0
+    },
+    "driving_control": {
+        "mean_lane_offset": 0.0,
+        "acceleration_std": 0.22934342030645902,
+        "mean_acceleration": -0.07692307692307693
+    },
+    "reasoning": {
+        "action_validity_rate": 100.0,
+        "hallucination_rate": 30.76923076923077,
+        "consistency_failure_rate": null
+    },
+    "performance": {
+        "distance": 288.6000061035156,
+        "survival_time": 12.0,
+        "average_speed": 24.092777545635517,
+        "reward": 10.058829600278107
+    },
+    "human_like": {
+        "decision_latency_ms": 29789.935377231108,
+        "human_like_score": 0.9440327048118206
+    }
+}
